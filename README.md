@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CLS demo
 
-## Getting Started
+A small Next.js app that demonstrates Cumulative Layout Shift (CLS) side by side. Two routes render the same article with the same late-arriving elements, but one reserves space for them and one does not. A live meter reads CLS straight from the browser as you watch.
 
-First, run the development server:
+- **Live demo:** https://cls-demo-seven.vercel.app/
+- **Companion guide:** Improve Cumulative Layout Shift (CLS) on Vercel
+
+## Routes
+
+- `/` — overview and links to the two demo routes.
+- `/janky` — a cookie banner, a promo block, and an image mount after load into the normal flow with no reserved space. Each one pushes the article down, so the meter climbs into the red.
+- `/stable` — the same elements on the same schedule, but each sits in a slot that holds its height from first paint. Nothing moves and the meter stays at 0.000.
+
+The only difference between the two routes is whether space is reserved, which is the whole point: reserve the space before the content arrives.
+
+## The live CLS meter
+
+`app/components/cls-meter.tsx` is a client component that reads layout shifts from the browser's [Layout Instability API](https://developer.mozilla.org/en-US/docs/Web/API/Layout_Instability_API) via `PerformanceObserver`. It applies the same session-window math as the field metric (the largest burst of shifts each less than 1s apart, capped at a 5s window) and color-codes the value against the 0.1 and 0.25 thresholds. It resets on each route so every run starts clean.
+
+This is the same signal Vercel Speed Insights reports from real users.
+
+## Speed Insights
+
+`<SpeedInsights />` from [`@vercel/speed-insights`](https://vercel.com/docs/speed-insights) is mounted in the root layout. Locally it runs in debug mode and logs to the console without sending data. To report field CLS to the dashboard:
+
+1. In the Vercel dashboard, open the project, go to **Speed Insights**, and click **Enable**.
+2. Deploy. Once real visitors hit `/janky` and `/stable`, CLS shows up per route.
+
+Query it from the CLI once data is flowing:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+vercel metrics vercel.speed_insights.cls -a p75 --group-by route \
+  -f "environment eq 'production'" --since 7d --project <your-project> --format json
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`/janky` reads poor at P75; `/stable` reads good.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Run locally
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm install
+pnpm dev
+```
 
-## Learn More
+Open [http://localhost:3000](http://localhost:3000). To demo: reload `/janky` and watch the meter spike, then reload `/stable` and watch it hold at 0.
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+pnpm build   # production build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next.js 16 (App Router) · React 19 · Tailwind CSS v4 · `@vercel/speed-insights`.
